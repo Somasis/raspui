@@ -2,8 +2,10 @@
 
 OLDIFS="$IFS"
 IFS=$'\n'
-for release_line in $(</etc/os-release);do
-    eval "RELEASE_$release_line"
+for file in /etc/*-release;do
+    for release_line in $(<$file);do
+        eval "RELEASE_$release_line"
+    done
 done
 IFS="$OLDIFS"
 
