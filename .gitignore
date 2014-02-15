@@ -1,20 +1,10 @@
-<<<<<<< HEAD
 dirlisting.css
-=======
->>>>>>> bf7163faeeb70a75cad0eee6f1a797284022c4df
-# Compiled source #
-###################
 *.com
 *.class
 *.dll
 *.exe
 *.o
 *.so
-
-# Packages #
-############
-# it's better to unpack these files and commit the raw source
-# git has its own built in compression methods
 *.7z
 *.dmg
 *.gz
@@ -23,15 +13,9 @@ dirlisting.css
 *.rar
 *.tar
 *.zip
-
-# Logs and databases #
-######################
 *.log
 *.sql
 *.sqlite
-
-# OS generated files #
-######################
 .DS_Store
 .DS_Store?
 ._*
@@ -39,11 +23,6 @@ dirlisting.css
 .Trashes
 ehthumbs.db
 Thumbs.db
-<<<<<<< HEAD
 config.sh
 jqueryFileTree.css
 jqueryFileTree.js
-=======
-
-config.sh
->>>>>>> bf7163faeeb70a75cad0eee6f1a797284022c4df
