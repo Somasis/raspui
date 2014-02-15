@@ -34,7 +34,7 @@ and if you need to change the defaults:
 
     mv config.example.sh config.sh
 
-then, go to your webserver and open index.sh. [configuration](adjust config.sh as needed.)
+then, go to your webserver and open index.sh. [adjust config.sh as needed.](#configuration)
 don't change settings in config.example.sh, as they are overwritten on [update](#updating)
 
 ## updating
