@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 dirlisting.css
+=======
+>>>>>>> bf7163faeeb70a75cad0eee6f1a797284022c4df
 # Compiled source #
 ###################
 *.com
@@ -36,6 +39,11 @@ dirlisting.css
 .Trashes
 ehthumbs.db
 Thumbs.db
+<<<<<<< HEAD
 config.sh
 jqueryFileTree.css
 jqueryFileTree.js
+=======
+
+config.sh
+>>>>>>> bf7163faeeb70a75cad0eee6f1a797284022c4df
