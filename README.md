@@ -1,6 +1,6 @@
 # raspui
 
-![raspui logo](logo.png)
+![raspui logo](favicon-195.png)
 
 raspberry pi web interface, providing a look at the system status. probably works great on other systems as well, but i use it on my raspberry pi.
 
