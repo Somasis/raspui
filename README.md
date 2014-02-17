@@ -127,8 +127,6 @@ add this line to your apache configuration, which could be located at /etc/apach
     AddHandler cgi-script .sh
 
 ## planned
-- swap usage
-- user information
 - CPU hog display
 - integration with daemons like CouchPotato, SickBeard, Headphones.
 - world domination
