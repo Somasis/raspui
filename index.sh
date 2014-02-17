@@ -7,45 +7,6 @@ if [[ "$version" == "/" ]];then
     version="/dev"
 fi
 
-# set default variables in case you didn't configure them
-cpu_track_count=2
-
-cpu_warning_level=85
-cpu_high_level=60
-cpu_medium_level=25
-
-ram_warning_level=85
-ram_high_level=70
-ram_medium_level=30
-
-get_package_manager_version=$(pacman --color never -Q pacman)
-get_installed_packages=$(pacman --color never -Qq | wc -l)
-
-time=$(date +'%r')
-date=$(date +'%B %d, %Y')
-pretty_time="It's currently $time, on $date."
-
-string_title="$HOSTNAME - running $RELEASE_PRETTY_NAME"
-string_subheading="running $RELEASE_PRETTY_NAME"
-
-string_cpu="CPU"
-string_ram="RAM"
-
-string_system_header="System"
-string_network_header="Network"
-string_software_header="Software"
-
-string_process_total="running processes"
-string_packages_installed="packages installed"
-
-fontawesome_css="//netdna.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css"
-bootstrap_css="//netdna.bootstrapcdn.com/bootstrap/latest/css/bootstrap.min.css"
-bootstrap_theme_css="//netdna.bootstrapcdn.com/bootstrap/latest/css/bootstrap-theme.min.css"
-jquery_js="//code.jquery.com/jquery-1.11.0.min.js"
-bootstrap_js="//netdna.bootstrapcdn.com/bootstrap/latest/js/bootstrap.min.js"
-html5shiv_js="//cdn.jsdelivr.net/html5shiv/latest/html5shiv.js"
-respondjs_js="//cdn.jsdelivr.net/respond/latest/respond.min.js"
-
 # read configuration files
 if [[ -f "config.example.sh" ]];then
     . config.example.sh
@@ -54,34 +15,71 @@ if [[ -f "config.sh" ]];then
     . config.sh
 fi
 
+# calculating CPU usage
+# we want to gather this information first, because if we do it after all
+# the processes this script has to make to get all the data, it could make
+# it seem much higher than it really is.
+count=0
+PREV_TOTAL=0
+PREV_IDLE=0
+while [[ "$count" -ne $cpu_track_count ]];do
+    CPU=($(sed -n 's/^cpu\s//p' /proc/stat))
+    IDLE=${CPU[3]} # Just the idle CPU time.
+    TOTAL=0
+    for VALUE in "${CPU[@]}"; do
+        let "TOTAL=$TOTAL+$VALUE"
+    done
+    let "DIFF_IDLE=$IDLE-$PREV_IDLE"
+    let "DIFF_TOTAL=$TOTAL-$PREV_TOTAL"
+    let "DIFF_USAGE=(1000*($DIFF_TOTAL-$DIFF_IDLE)/$DIFF_TOTAL+5)/10"
+    PREV_TOTAL="$TOTAL"
+    PREV_IDLE="$IDLE"
+    count=$(( $count + 1 ))
+    sleep .1s
+done
+cpu_usage="$DIFF_USAGE"
+if [[ "$cpu_usage" -gt "$cpu_warning_level" ]];then
+    cpu_usage_level=progress-bar-danger
+elif [[ "$cpu_usage" -gt "$cpu_high_level" ]];then
+    cpu_usage_level=progress-bar-warning
+elif [[ "$cpu_usage" -gt "$cpu_medium_level" ]];then
+    cpu_usage_level=progress-bar-success
+else
+    cpu_usage_level=progress-bar-info
+fi
+
+
+unique_users=$(users | tr ' ' '\n')
+online_users=$(echo "$unique_users" | wc -l)
+unique_users=$(echo "$unique_users" | sort -u | wc -l)
+
 process_total=$(ps --no-header -ax 2>/dev/null | wc -l)
 
 packages_installed="$get_installed_packages"
 package_manager_version="$get_package_manager_version"
 
+kernel_release="$(uname -s)/$(uname -rm)"
+kernel_version=$(uname -v)
+
+loadavg=$(cut -d' ' -f1-3 /proc/loadavg)
+loadavg_1min=$(echo "$loadavg" | cut -d' ' -f1)
+loadavg_5min=$(echo "$loadavg" | cut -d' ' -f2)
+loadavg_15min=$(echo "$loadavg" | cut -d' ' -f3)
+
+
 local_ip=$(ip route | grep src | sed 's/.*src //;s/ .*//')
 remote_ip=$(wget -qO - "http://canhazip.com" | head -n1)
+active_interface=$(route -n | grep "^0.0.0.0" | rev | cut -d' ' -f1 | rev)
 
-if [[ -z "$TZ" ]];then
-    if [[ -z "$ZONE" ]];then
-        if [[ ! -f /etc/localtime ]];then
-            timezone=$(date +%Z)
-        else
-            timezone=$(readlink /etc/localtime)
-            timezone="${timezone##*zoneinfo/}"
-            while [[ "$timezone" =~ "_" ]];do
-                timezone="${timezone/_/ }"
-            done
-        fi
-    else
-        timezone="$ZONE"
-    fi
-else
-    timezone="$TZ"
-fi
+# we used to use a few if statements to get this, but i think EST is more useful
+# than giving something like "America/New York" as the timezone.
+# to the inquiring user: what timezone is New York in? and further more,
+# what timezone is this system in? by giving the user America/New York or similar,
+# we do not answer the question being posed as to the timezone we're in. so we use %Z.
+timezone=$(date +'%Z (UTC%z)')
 
 # calculate RAM usage
-ram_info=$(_grep 'Mem' "/proc/meminfo" | remove_spaces)
+ram_info=$(_grep 'Mem' "/proc/meminfo" | replace_spaces)
 ram_total=$(echo "$ram_info" | _grep MemTotal | cut -d':' -f2 | tr -d '[A-z]')
 ram_available=$(echo "$ram_info" | _grep MemFree | cut -d':' -f2 | tr -d '[A-z]')
 ram_used=$(( $ram_total - $ram_available ))
@@ -120,41 +118,83 @@ else
 fi
 ram_used=$(round "$ram_used" 1024)$ram_prefix
 
-cpus=$(_grep 'processor' "/proc/cpuinfo" | remove_spaces | remove_tabs | grep 'processor:' | wc -l)
+if [[ "$(( $(wc -l /proc/swaps | cut -d ' ' -f1) - 1 ))" -ne 0 ]];then
+    swap_enabled=true
+    swaps=$(cut -d' ' -f1 /proc/swaps | _grep /)
+    swap_info=$(_grep 'Swap' "/proc/meminfo" | replace_spaces)
+    swap_total=$(echo "$swap_info" | _grep SwapTotal | cut -d':' -f2 | tr -d '[A-z]')
+    swap_available=$(echo "$swap_info" | _grep SwapFree | cut -d':' -f2 | tr -d '[A-z]')
+    swap_used=$(( $swap_total - $swap_available ))
+
+    # calculate swap usage
+    swap_usage=$(expr $(expr "$swap_used" \* 100 ) / $swap_total )
+
+    if [[ "$swap_usage" -gt "$swap_warning_level" ]];then
+        swap_usage_level=progress-bar-danger
+    elif [[ "$swap_usage" -gt "$swap_high_level" ]];then
+        swap_usage_level=progress-bar-warning
+    elif [[ "$swap_usage" -gt "$swap_medium_level" ]];then
+        swap_usage_level=progress-bar-success
+    else
+        swap_usage_level=progress-bar-info
+    fi
+
+    if [[ "$swap_total" -ge 1024 ]];then
+        swap_prefix=MB
+    else
+        swap_prefix=kB
+    fi
+    swap_total=$(round "$swap_total" 1024)$swap_prefix # now convert to megabytes for presenting
+    if [[ "$swap_available" -ge 1024 ]];then
+        swap_prefix=MB
+    else
+        swap_prefix=kB
+    fi
+    swap_available=$(round "$swap_available" 1024)$swap_prefix
+    if [[ "$swap_used" -ge 1024 ]];then
+        swap_prefix=MB
+    else
+        swap_prefix=kB
+    fi
+    swap_used=$(round "$swap_used" 1024)$swap_prefix
+fi
+
+swap_usage_data=$(swapon -e --noheadings --raw --show=name,size,used)
 
 cpu_model=$(echo $(_grep 'model name' /proc/cpuinfo | cut -d':' -f2))
-# calculating CPU usage
-count=0
-PREV_TOTAL=0
-PREV_IDLE=0
-while [[ "$count" -ne $cpu_track_count ]];do
-    CPU=($(sed -n 's/^cpu\s//p' /proc/stat))
-    IDLE=${CPU[3]} # Just the idle CPU time.
-    TOTAL=0
-    for VALUE in "${CPU[@]}"; do
-        let "TOTAL=$TOTAL+$VALUE"
-    done
-    let "DIFF_IDLE=$IDLE-$PREV_IDLE"
-    let "DIFF_TOTAL=$TOTAL-$PREV_TOTAL"
-    let "DIFF_USAGE=(1000*($DIFF_TOTAL-$DIFF_IDLE)/$DIFF_TOTAL+5)/10"
-    PREV_TOTAL="$TOTAL"
-    PREV_IDLE="$IDLE"
-    count=$(( $count + 1 ))
-    sleep .1s
-done
-cpu_usage="$DIFF_USAGE"
-if [[ "$cpu_usage" -gt "$cpu_warning_level" ]];then
-    cpu_usage_level=progress-bar-danger
-elif [[ "$cpu_usage" -gt "$cpu_high_level" ]];then
-    cpu_usage_level=progress-bar-warning
-elif [[ "$cpu_usage" -gt "$cpu_medium_level" ]];then
-    cpu_usage_level=progress-bar-success
+
+if [[ "$raspi_logo" == "true" ]];then
+    raspi_logo="<div class='header-logo'><a href='$REQUEST_URI'><i style='color:$raspi_logo_color' class='raspi-logo raspi-icon raspi-o1 text-center'></i></a><a href='https://github.com/somasis/raspui'><small class='show-on-hover small'>raspui$version</small></a></div>"
+    footer=
 else
-    cpu_usage_level=progress-bar-info
+    raspi_logo=
+    footer="<footer class='text-center'><a href='https://github.com/somasis/raspui'><small class='small'>raspui$version</small></a></footer>"
 fi
+
+uptime=$(</proc/uptime)
+uptime=${uptime%%.*}
+
+seconds=$(( uptime%60 ))
+minutes=$(( uptime/60%60 ))
+hours=$(( uptime/60/60%24 ))
+days=$(( uptime/60/60/24 ))
+if [[ "$days" -gt 0 ]];then
+    days="$days days, "
+fi
+if [[ "$hours" -gt 0 ]];then
+    hours="$hours hours, "
+fi
+if [[ "$minutes" -gt 0 ]];then
+    minutes="$minutes minutes, "
+fi
+if [[ "$seconds" -gt 0 ]];then
+    seconds="$seconds seconds"
+fi
+uptime="$days$hours$minutes$seconds"
+
 content_type html
 
-cat <<EOF
+html <<EOF
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -162,10 +202,26 @@ cat <<EOF
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>$string_title</title>
+        <link rel="shortcut icon" sizes="16x16 32x32 48x48 64x64" href="favicon.ico">
+        <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+        <!--[if IE]>
+            <link rel="shortcut icon" href="favicon.ico">
+        <![endif]-->
+        <link rel="icon" type="image/png" sizes="195x195" href="favicon-195.png">
+        <link rel="apple-touch-icon" sizes="152x152" href="favicon-152.png">
+        <link rel="apple-touch-icon" sizes="144x144" href="favicon-144.png">
+        <link rel="apple-touch-icon" sizes="120x120" href="favicon-120.png">
+        <link rel="apple-touch-icon" sizes="114x114" href="favicon-114.png">
+        <link rel="icon" type="image/png" sizes="96x96" href="favicon-96.png">
+        <link rel="apple-touch-icon" sizes="76x76" href="favicon-76.png">
+        <link rel="apple-touch-icon" sizes="72x72" href="favicon-72.png">
+        <link rel="apple-touch-icon" href="favicon-57.png">
+        <meta name="msapplication-TileColor" content="#FFFFFF">
+        <meta name="msapplication-TileImage" content="favicon-144.png">
         <link href="$fontawesome_css" rel="stylesheet">
         <link href="$bootstrap_css" rel="stylesheet">
         <link href="$bootstrap_theme_css" rel="stylesheet">
-        <link href="bootstrap-mods.css" rel="stylesheet">
+        <link href="raspui.css" rel="stylesheet">
         <!--[if lt IE 9]>
             <script src="$html5shiv_js"></script>
             <script src="$respondjs_js"></script>
@@ -175,10 +231,13 @@ cat <<EOF
     </head>
     <body>
         <div class='container'>
-            <header class='page-header'>
-                <img class='logo' src='logo.png'>
-                <h1 style='display: inline; font-size: 24px;'>$HOSTNAME <small>$string_subheading</small></h1><br />
-                <h4 style='display: inline; font-size: 13px;'>$pretty_time</h4>
+            <header class='page-header'>$raspi_logo
+                <h1 style='font-size: 24px;color:$raspi_logo_color !important' class='text-center'>$HOSTNAME <small>$string_subheading</small></h1>
+                <div class='text-center'>
+                    <div title='$timezone' style='padding: .2em .6em .3em;font-size: 75%;font-weight: 700;line-height: 1;color: #fff;border-radius: .25em;display:inline;background-color: #428bca;'>
+                        $pretty_time
+                    </div>
+                </div>
             </header>
             <div class="row">
                 <div class="col-md-4">
@@ -186,16 +245,27 @@ cat <<EOF
                     <table>
                         <tbody>
                             <tr>
-                                <td><i class='fa fa-home'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-home'></i>&nbsp;</td>
                                 <td>$HOSTNAME</td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-linux'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-user'></i>&nbsp;</td>
+                                <td><span class="badge">$unique_users</span> ($online_users$string_users_non_unique)
+                            <tr>
+                                <td class='data-label'><i class='fa fa-linux'></i>&nbsp;</td>
                                 <td><a href="$RELEASE_HOME_URL">$RELEASE_PRETTY_NAME</a></td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-clock-o'></i>&nbsp;</td>
-                                <td>$timezone</td>
+                                <td></td>
+                                <td>$kernel_release</td>
+                            </tr>
+                            <tr>
+                                <td></td>
+                                <td>$kernel_version</td>
+                            </tr>
+                            <tr>
+                                <td class='data-label'><i class='fa fa-clock-o'></i>&nbsp;</td>
+                                <td>$uptime</td>
                             </tr>
                         </tbody>
                     </table>
@@ -209,8 +279,12 @@ cat <<EOF
                                 <td>$local_ip</td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-globe'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-globe'></i>&nbsp;</td>
                                 <td>$remote_ip</td>
+                            </tr>
+                            <tr>
+                                <td class='data-label'>&nbsp;</td>
+                                <td>$active_interface</td>
                             </tr>
                         </tbody>
                     </table>
@@ -220,15 +294,15 @@ cat <<EOF
                     <table>
                         <tbody>
                             <tr>
-                                <td><i class='fa fa-cloud'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-cloud'></i>&nbsp;</td>
                                 <td>$SERVER_SOFTWARE</td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-terminal'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-terminal'></i>&nbsp;</td>
                                 <td>bash/$BASH_VERSION</td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-dropbox'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-dropbox'></i>&nbsp;</td>
                                 <td>$package_manager_version</td>
                             </tr>
                             <tr>
@@ -240,7 +314,13 @@ cat <<EOF
                 </div>
             </div><br />
             <div class="row">
-                <div class="col-md-4">
+EOF
+if [[ "$swap_enabled" == "true" ]];then
+    html "                <div class=\"col-md-4\">"
+else
+    html "                <div class=\"col-md-6\">"
+fi
+html <<EOF
                     <h5 class='section-header'>$string_cpu</h5>
                     <table>
                         <tbody>
@@ -252,17 +332,37 @@ cat <<EOF
                                 </div>
                             </tr>
                             <tr>
-                                <td></td>
-                                <td>$cpu_model</td>
+                                <td class='data-label'>$string_loadavgs<i class='fa fa-tasks'></i>&nbsp;</td>
+                                <td>$loadavg_1min (1min)<br />$loadavg_5min (5min)<br />$loadavg_15min (15min)<br /></td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-cog'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-cog'></i>&nbsp;</td>
                                 <td>$process_total $string_process_total</td>
+                            </tr>
+                            <tr>
+                                <td class='data-label'><i class='fa fa-rocket'></i>&nbsp;</td>
+                                <td>
+EOF
+i=0
+for cpu_core in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor;do
+    i=$(( $i + 1 ))
+    current_gov=$(<"$cpu_core")
+    html "CPU#$i: $current_gov<br />"
+done
+i=
+html <<EOF
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <div class="col-md-4">
+EOF
+if [[ "$swap_enabled" == "true" ]];then
+    html "                <div class=\"col-md-4\">"
+else
+    html "                <div class=\"col-md-6\">"
+fi
+html <<EOF
                     <h5 class='section-header'>$string_ram</h5>
                     <table>
                         <tbody>
@@ -274,25 +374,69 @@ cat <<EOF
                                 </div>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-circle'></i>&nbsp;&nbsp;</td>
+                                <td class='data-label'>$string_ram_used<i class='fa fa-circle'>&nbsp;</i></td>
                                 <td>${ram_used}</td>
                             </tr>
                             <tr>
-                                <td><i class='fa fa-circle-o'></i>&nbsp;&nbsp;</td>
+                                <td class='data-label'>$string_ram_free<i class='fa fa-circle-o'></i>&nbsp;</td>
                                 <td>${ram_available}</td>
                             </tr>
                             <tr>
-                                <td>Total:&nbsp;</td>
+                                <td class='data-label'>$string_ram_total</td>
                                 <td>${ram_total}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
-            <footer>
-                <p class='text-right'><small class='small'>Powered by <a href="https://github.com/somasis/raspui">raspui$version</a></small></p>
-            </footer>
+EOF
+if [[ "$swap_enabled" == "true" ]];then
+    html <<EOF
+                <div class='col-md-4'>
+                    <h5 class='section-header'>$string_swap</h5>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <div class="progress">
+                                    <div class="progress-bar $swap_usage_level" role="progressbar" aria-valuenow="$swap_usage" aria-valuemin="0" aria-valuemax="100" style="width: $swap_usage%;">
+                                        $swap_usage%
+                                    </div>
+                                </div>
+                            </tr>
+                            <tr>
+                                <td class='data-label'>$string_swap_used<i class='fa fa-circle'></i>&nbsp;</td>
+                                <td>${swap_used}</td>
+                            </tr>
+                            <tr>
+                                <td class='data-label'>$string_swap_free<i class='fa fa-circle-o'></i>&nbsp;</td>
+                                <td>${swap_available}</td>
+                            </tr>
+                            <tr>
+                                <td class='data-label'>$string_swap_total</td>
+                                <td>${swap_total}</td>
+                            </tr>
+                            <tr>
+                                <td class='data-label'>$string_swap_devices</td>
+                                <td>
+EOF
+    for swap in $swaps;do
+        specific_swap_usage=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f3)
+        specific_swap_total=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f2)
+        specific_swap="$specific_swap_usage/$specific_swap_total"
+        html "<code>$swap</code> - $specific_swap<br />"
+    done
+    html <<EOF
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+EOF
+fi
+html <<EOF
+            </div>$footer
         </div>
     </body>
 </html>
 EOF
+
+print_html

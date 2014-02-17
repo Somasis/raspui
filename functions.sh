@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OLDIFS="$IFS"
+_OLDIFS="$IFS"
 IFS=$'\n'
 # read /etc/*-release files, they contain information about what system is being used.
 for file in /etc/*-release;do
@@ -8,7 +8,7 @@ for file in /etc/*-release;do
         eval "RELEASE_$release_line"
     done
 done
-IFS="$OLDIFS"
+IFS="$_OLDIFS"
 
 # tells the script what protocol the browser is using
 # we probably should do this a different way, however...
@@ -31,49 +31,49 @@ fi
 if [[ -n "${QUERY_STRING}" ]]; then 
   # name=value params, separated by either '&' or ';'
   if echo "${QUERY_STRING}" | grep '=' >/dev/null ; then
-    for Q in $(echo "${QUERY_STRING}" | tr ";&" "\012") ; do
-      name=
-      value=
-      tmpvalue=
-      name="${Q%%=*}"
-      name=$(echo "${name}" | sed -e 's/%\(\)/\\\x/g' | tr "+" " ")
-      name=$(echo "${name}" | tr -d ".-")
-      name=$(printf "${name}")
-      tmpvalue="${Q#*=}"
-      tmpvalue=$(echo "${tmpvalue}" | sed -e 's/%\(..\)/\\\x\1 /g')
-      for i in ${tmpvalue}; do
-          g=$(printf "${i}")
-          value="${value}${g}"
+    for _Q in $(echo "${QUERY_STRING}" | tr ";&" "\012") ; do
+      _name=
+      _value=
+      _tmpvalue=
+      _name="${_Q%%=*}"
+      _name=$(echo "${_name}" | sed -e 's/%\(\)/\\\x/g' | tr "+" " ")
+      _name=$(echo "${_name}" | tr -d ".-")
+      _name=$(printf "${_name}")
+      _tmpvalue="${_Q#*=}"
+      _tmpvalue=$(echo "${_tmpvalue}" | sed -e 's/%\(..\)/\\\x\1 /g')
+      for _i in ${_tmpvalue}; do
+          _g=$(printf "${_i}")
+          _value="${_value}${_g}"
       done
-      eval "export ${name}='${value}'"
+      eval "export ${_name}='${_value}'"
     done
   else
-    Q=$(echo "${QUERY_STRING}" | tr '+' ' ')
+    _Q=$(echo "${QUERY_STRING}" | tr '+' ' ')
     eval "export KEYWORDS='${Q}'"
   fi
 fi
 
 if [[ -n "${HTTP_COOKIE}" ]]; then 
-  for Q in ${HTTP_COOKIE}; do
-    name=
-    value=
-    tmpvalue=
+  for _Q in ${HTTP_COOKIE}; do
+    _name=
+    _value=
+    _tmpvalue=
 
-    Q="${Q%;}"
+    _Q="${_Q%;}"
 
-    name="${Q%%=*}"
-    name=$(echo "${name}" | sed -e 's/%\(\)/\\\x/g' | tr "+" " ")
-    name=$(echo "${name}" | tr -d ".-")
-    name=$(printf "${name}")
+    _name="${_Q%%=*}"
+    _name=$(echo "${_name}" | sed -e 's/%\(\)/\\\x/g' | tr "+" " ")
+    _name=$(echo "${_name}" | tr -d ".-")
+    _name=$(printf "${_name}")
 
-    tmpvalue="${Q#*=}"
-    tmpvalue=$(echo "${tmpvalue}" | sed -e 's/%\(..\)/\\\x\1 /g')
+    _tmpvalue="${_Q#*=}"
+    _tmpvalue=$(echo "${_tmpvalue}" | sed -e 's/%\(..\)/\\\x\1 /g')
 
-    for i in ${tmpvalue}; do
-        g=$(printf "${i}")
-        value="${value}${g}"
+    for _i in ${_tmpvalue}; do
+        _g=$(printf "${_i}")
+        _value="${_value}${_g}"
     done
-    eval "export cookie_${name}='${value}'"
+    eval "export cookie_${_name}='${_value}'"
   done
 fi
 
@@ -83,23 +83,23 @@ fi
 #   if cookie name and cookie value given, set [cookie name] to [cookie value]
 cookie() {
   if [[ "$#" -eq 1 ]]; then
-    name="$1"
-    name=$(echo "${name}" | sed -e 's/cookie_//')
-    value=$(env | grep "^cookie_${name}" | sed -e 's/cookie_//' | cut -d= -f2-)
-    echo "${value}"
+    _name="$1"
+    _name=$(echo "${_name}" | sed -e 's/cookie_//')
+    _value=$(env | grep "^cookie_${_name}" | sed -e 's/cookie_//' | cut -d= -f2-)
+    echo "${_value}"
   elif [[ $# -gt 1 ]]; then
-    name="$1"
+    _name="$1"
     shift
-    value="$*"
-    bashlib_cookies="${bashlib_cookies}; ${name}=${value}"
+    _value="$*"
+    bashlib_cookies="${bashlib_cookies}; ${_name}=${_value}"
     bashlib_cookies="${bashlib_cookies#;}"
-    eval "export 'cookie_${name}=$*'"
+    eval "export 'cookie_${_name}=$*'"
   else
-    value=$(env | grep '^cookie_' | sed -e 's/cookie_//' | cut -d= -f1)
-    echo "${value}"
+    _value=$(env | grep '^cookie_' | sed -e 's/cookie_//' | cut -d= -f1)
+    echo "${_value}"
   fi
-  name=
-  value=
+  _name=
+  _value=
 }
 
 # keywords(): returns a list of keywords.
@@ -112,9 +112,10 @@ keywords() {
 
 # send_redirect(uri): sends the browser a request to redirect to $uri
 send_redirect() {
-  uri="$@"
-  echo "Location: ${uri}"
+  _uri="$@"
+  echo "Location: ${_uri}"
   echo
+  _uri=
 }
 
 
@@ -127,92 +128,107 @@ get_content_type() {
 content_type() {
     case "$@" in
         html)
-            content_type="text/html"
+            _content_type="text/html"
             ;;
         text)
-            content_type="text/plain"
+            _content_type="text/plain"
             ;;
         css)
-            content_type="text/css"
+            _content_type="text/css"
             ;;
         js)
-            content_type="application/javascript"
+            _content_type="application/javascript"
             ;;
         *)
-            content_type="$@"
+            _content_type="$@"
             ;;
     esac
-    echo "Content-type: $content_type"
+    echo "Content-type: $_content_type"
     echo
 }
 
 # grep(string to search for,[file, if empty stdin will be used]): very, very basic grep replacement.
 _grep() {
-    grep_for="$1"
-    grep_file="$2"
-    if [[ -z "$grep_file" ]];then
-        grep_input="$(</dev/stdin)"
-    elif [[ ! -f "$grep_file" ]];then
-        echo "$grep_file is not a real file"
+    _grep_for="$1"
+    _grep_file="$2"
+    if [[ -z "$_grep_file" ]];then
+        _grep_input="$(</dev/stdin)"
+    elif [[ ! -f "$_grep_file" ]];then
+        echo "$_grep_file is not a real file"
         exit 2
     else
-        grep_input="$(<$grep_file)"
+        _grep_input="$(<$_grep_file)"
     fi
-    grep_line=
-    OLDIFS="$IFS"
+    _grep_line=
+    _OLDIFS="$IFS"
     IFS=$'\n'
-    echo "$grep_input" | while read grep_line; do
-        if [[ "$grep_line" == *"$grep_for"* ]];then
-            echo "$grep_line"
+    echo "$_grep_input" | while read _grep_line; do
+        if [[ "$_grep_line" == *"$_grep_for"* ]];then
+            echo "$_grep_line"
         fi
     done 
-    IFS="$OLDIFS"
-    grep_for=
-    grep_file=
-    grep_input=
-    grep_line=
-    OLDIFS=
+    IFS="$_OLDIFS"
+    _grep_for=
+    _grep_file=
+    _grep_input=
+    _grep_line=
+    _OLDIFS=
 }
 
 # round(dividend/divisor): gives you a properly rounded version of $dividend/$divisor
 round() { # src: http://ubuntuforums.org/showthread.php?t=1371892&p=8606385#post8606385
-    x="$1"
-    y="$2"
-    a=$(( $x/$y ))
-    b=$(( ($x * 10) / $y ))
-    c=$(( $b - ($a *10 ) ))
-    if [[ "$c" -lt 5 ]]; then
-        a=$(( $a + 1 ))
+    _x="$1"
+    _y="$2"
+    _a=$(( $_x/$_y ))
+    _b=$(( ($_x * 10) / $_y ))
+    _c=$(( $_b - ($_a *10 ) ))
+    if [[ "$_c" -lt 5 ]]; then
+        _a=$(( $_a + 1 ))
     fi
-    echo "$a"
-    x=
-    y=
-    a=
-    b=
-    c=
+    echo "$_a"
+    _x=
+    _y=
+    _a=
+    _b=
+    _c=
 }
 
-# remove_spaces(string): gives a version of the string without any spaces, can use stdin instead
-remove_spaces() { # replaces tr -d ' '
-    if [[ -z "$@" ]];then
-        rm_spaces_string=$(</dev/stdin)
+# replace_spaces(string,): gives a version of the string with spaces replaced with <1>, can use stdin instead
+replace_spaces() { # replaces tr -d ' '
+    if [[ -z "$1" ]];then
+        _spaces_string=$(</dev/stdin)
     else
-        rm_spaces_string="$@"
+        _spaces_string="$1"
     fi
-    while [[ "$rm_spaces_string" == *" "* ]];do
-        rm_spaces_string="${rm_spaces_string/ /}"
+    while [[ "$_spaces_string" == *" "* ]];do
+        _spaces_string="${_spaces_string/ /}"
     done
-    echo "$rm_spaces_string"
-    rm_spaces_string=
+    echo "$_spaces_string"
+    _spaces_string=
 }
 
 # remove_spaces(string): gives a version of the string without any spaces, can use stdin instead
 remove_tabs() {
     if [[ -z "$@" ]];then
-        rm_tabs_string=$(</dev/stdin)
+        _tabs_string=$(</dev/stdin)
     else
-        rm_tabs_string="$@"
+        _tabs_string="$@"
     fi
-    echo "$rm_tabs_string" | tr -d '\011'
-    rm_tabs_string=
+    echo "$_tabs_string" | tr -d '\011'
+    _tabs_string=
+}
+
+# html([html]): append to the final html output. accepts stdin input.
+html() {
+    if [[ -z "$@" ]];then
+        _html_input=$(</dev/stdin)
+    else
+        _html_input="$@"
+    fi
+    _html=$(echo "$_html$_html_input" | sed -e "s/^[ \t]*//g;/^$/d;s/>[ ]*</\>\</g" | tr -d '\n')
+}
+
+# print_html(): just prints the html in the $_html variable, which has been minimized
+print_html() {
+    echo "$_html"
 }

@@ -11,22 +11,38 @@ ram_warning_level=85
 ram_high_level=70
 ram_medium_level=30
 
-get_package_manager_version=$(pacman --color never -Q pacman)
+get_package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
 get_installed_packages=$(pacman --color never -Qq | wc -l)
 
 time=$(date +'%r')
 date=$(date +'%B %d, %Y')
 pretty_time="It's currently $time, on $date."
 
+raspi_logo=true
+raspi_logo_color="#d6264f"
+
 string_title="$HOSTNAME - running $RELEASE_PRETTY_NAME"
 string_subheading="running $RELEASE_PRETTY_NAME"
 
 string_cpu="CPU"
 string_ram="RAM"
+string_swap="Swap"
+string_loadavgs="Load average&nbsp;"
+
+string_ram_used="Used&nbsp;"
+string_ram_free="Free&nbsp;"
+string_ram_total="Total&nbsp;"
+
+string_swap_used="Used&nbsp;"
+string_swap_free="Free&nbsp;"
+string_swap_total="Total&nbsp;"
+string_swap_devices="Devices&nbsp;"
 
 string_system_header="System"
 string_network_header="Network"
 string_software_header="Software"
+
+string_users_non_unique=" non-unique"
 
 string_process_total="running processes"
 string_packages_installed="packages installed"

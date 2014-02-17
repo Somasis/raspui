@@ -13,8 +13,13 @@ licensed under [the MIT License](LICENSE).
 - basic info
     - local time and date
     - hostname
+    - logged in users
     - linux distribution being ran (given [/etc/os-release](http://www.freedesktop.org/software/systemd/man/os-release.html) files are present)
+    - kernel version, release, and machine hardware name
+    - uptime
+- network information
     - local network and remote IP address (courtesy of [canhazip.com](http://canhazip.com))
+    - current active network interface
 - software information
     - server software/version
     - bash version (raspui runs on bash, if you didn't know)
@@ -24,9 +29,14 @@ licensed under [the MIT License](LICENSE).
     - number of packages installed
 - CPU information
     - display accurate CPU usage
+    - load averages over 1min/5min/15min
     - running processes
+    - current cpufreq governor (per-core)
 - RAM usage
     - free/used/total in megabyte/kilobyte amounts
+- Swap (only shows if you have any swap files or partitions)
+    - free/used/total in megabyte/kilobyte amounts
+    - show active swap devices and per-device usage
 
 ## installation
 
@@ -71,12 +81,21 @@ any variables not specified in config.sh will be inherited from config.example.s
         - by default, $pretty_time is "It's currently $time, on $date."
     - by default, time is displayed as %r, which is the locale default 12-hour clock time. ex. 11:11:04 PM
     - by default, date is displayed as %B %d, %Y, which is the full month name, current day, and then four-number year. ex. February 23, 2014
+- raspi_logo: sets the visibility of the raspberry pi logo in the header
+    - this also sets the raspui version and link to be in the footer of the page instead of appearing on logo hover.
+- raspi_logo_color: sets the color of the logo
+    - also sets the color used for the hostname in the header.
 - any variable prefixed with string_ is a variable used to customize the way data is shown on the page.
     - string_title: changes the string used as the page title (this is not the title used in the header)
     - string_subheading: changes the string used for the subheading.
     - string_cpu: changes the word used for CPU.
     - string_ram: changes the word used for RAM.
+    - string_swap: changes the word used for swap.
+    - string_loadavgs: changes the word used for load averages.
+    - string_{ram,swap}_{used,free,total}: changes the prefix for the {used,free,total} amount of {ram,swap}
+    - string_swap_devices: changes the word used for swap devices.
     - string_{system,network,software}_header: changes the word used in the header above the {system,network,software} section
+    - string_users_non_unique: changes the phrase used for the amount of non-unique currently logged in users
     - string_process_total: changes the suffix of the number of running processes. ex. 75 $string_process_total
     - string_packages_installed: changes the suffix used after the number of packages installed. ex. 200 $string_packages_installed
 - locations of dependency css/js:
@@ -108,8 +127,8 @@ add this line to your apache configuration, which could be located at /etc/apach
     AddHandler cgi-script .sh
 
 ## planned
+- swap usage
 - user information
-- RAM information
 - CPU hog display
 - integration with daemons like CouchPotato, SickBeard, Headphones.
 - world domination
