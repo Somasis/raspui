@@ -26,3 +26,5 @@ Thumbs.db
 config.sh
 jqueryFileTree.css
 jqueryFileTree.js
+cache/
+*.save

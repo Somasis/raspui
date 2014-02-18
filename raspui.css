@@ -1,3 +1,7 @@
+.glyphicon {
+    margin-right: -3px;
+}
+
 td {
     padding: 1px !important;
     vertical-align: top;
@@ -54,7 +58,6 @@ td {
     position: absolute;
     opacity: 1;
     height: auto;
-
 }
 
 .section-header {

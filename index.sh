@@ -7,6 +7,11 @@ if [[ "$version" == "/" ]];then
     version="/dev"
 fi
 
+# make cache folder
+if [[ ! -d './cache/' ]];then
+    mkdir ./cache/
+fi
+
 # read configuration files
 if [[ -f "config.example.sh" ]];then
     . config.example.sh
@@ -27,15 +32,15 @@ while [[ "$count" -ne $cpu_track_count ]];do
     IDLE=${CPU[3]} # Just the idle CPU time.
     TOTAL=0
     for VALUE in "${CPU[@]}"; do
-        let "TOTAL=$TOTAL+$VALUE"
+        TOTAL=$(( $TOTAL + $VALUE ))
     done
-    let "DIFF_IDLE=$IDLE-$PREV_IDLE"
-    let "DIFF_TOTAL=$TOTAL-$PREV_TOTAL"
-    let "DIFF_USAGE=(1000*($DIFF_TOTAL-$DIFF_IDLE)/$DIFF_TOTAL+5)/10"
+    DIFF_IDLE=$(( $IDLE - $PREV_IDLE ))
+    DIFF_TOTAL=$(( $TOTAL - $PREV_TOTAL ))
+    DIFF_USAGE=$(( $(( $(( $(( 1000 * $(( $DIFF_TOTAL - $DIFF_IDLE)) )) / $DIFF_TOTAL )) + 5)) / 10 )) 
     PREV_TOTAL="$TOTAL"
     PREV_IDLE="$IDLE"
     count=$(( $count + 1 ))
-    sleep .1s
+    sleep .05s
 done
 cpu_usage="$DIFF_USAGE"
 if [[ "$cpu_usage" -gt "$cpu_warning_level" ]];then
@@ -66,9 +71,30 @@ loadavg_1min=$(echo "$loadavg" | cut -d' ' -f1)
 loadavg_5min=$(echo "$loadavg" | cut -d' ' -f2)
 loadavg_15min=$(echo "$loadavg" | cut -d' ' -f3)
 
-
 local_ip=$(ip route | grep src | sed 's/.*src //;s/ .*//')
-remote_ip=$(wget -qO - "http://canhazip.com" | head -n1)
+
+retrieve_ip() {
+    remote_ip=$(wget -qO - http://ipecho.net/plain)
+    if [[ -z "$remote_ip" ]];then
+        remote_ip=$(wget -qO - http://whatismyip.akamai.com/)
+        if [[ -z "$remote_ip" ]];then
+            remote_ip=$(wget -qO - "http://canhazip.com" | head -n1)
+        fi
+    fi
+    echo "$remote_ip"
+}
+
+if [[ ! -f "./cache/ip" ]];then
+    remote_ip=$(retrieve_ip)
+    echo "$remote_ip" > "./cache/ip"
+else
+    if [[ $(date +%s -r './cache/ip') -lt $(date +%s --date="60 min ago") ]];then
+        remote_ip=$(retrieve_ip)
+        echo "$remote_ip" > "./cache/ip"
+    else
+        remote_ip="$(<'./cache/ip') (cached)"
+    fi
+fi
 active_interface=$(route -n | grep "^0.0.0.0" | rev | cut -d' ' -f1 | rev)
 
 # we used to use a few if statements to get this, but i think EST is more useful
@@ -159,9 +185,33 @@ if [[ "$(( $(wc -l /proc/swaps | cut -d ' ' -f1) - 1 ))" -ne 0 ]];then
     swap_used=$(round "$swap_used" 1024)$swap_prefix
 fi
 
+if [[ "$swap_enabled" == "true" ]];then
+    swap_column="                <div class=\"col-md-4\">"
+else
+    swap_column="                <div class=\"col-md-6\">"
+fi
+
 swap_usage_data=$(swapon -e --noheadings --raw --show=name,size,used)
 
 cpu_model=$(echo $(_grep 'model name' /proc/cpuinfo | cut -d':' -f2))
+
+i=0
+while true;do
+    if [[ ! -d /sys/devices/system/cpu/cpu$i/cpufreq/ ]];then
+        break
+    fi
+    current_gov=$(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_governor")
+    current_freq=$(round $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq") 1000)
+    min_freq=$(round $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_min_freq") 1000)
+    max_freq=$(round $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq") 1000)
+    i=$(( $i + 1 ))
+    cpufreq_data="${cpufreq_data}CPU#$i: $current_gov, ${current_freq}MHz<br />${min_freq}MHz min / ${max_freq}MHz max<br />"
+done
+
+cpu_temp_c=$(round $(</sys/class/thermal/thermal_zone0/temp) 1000)
+cpu_temp_f=$(( $(( $(( $cpu_temp_c * 9 )) / 5 )) + 32 )) # celsius to fahrenheit: $c*9/5+32
+
+i=
 
 if [[ "$raspi_logo" == "true" ]];then
     raspi_logo="<div class='header-logo'><a href='$REQUEST_URI'><i style='color:$raspi_logo_color' class='raspi-logo raspi-icon raspi-o1 text-center'></i></a><a href='https://github.com/somasis/raspui'><small class='show-on-hover small'>raspui$version</small></a></div>"
@@ -191,6 +241,17 @@ if [[ "$seconds" -gt 0 ]];then
     seconds="$seconds seconds"
 fi
 uptime="$days$hours$minutes$seconds"
+
+if [[ "$swap_enabled" == "true" ]];then
+    swap_html="$swap_html<div class='col-md-4'><h5 class='section-header'>$string_swap</h5><table><tbody><tr><div class=\"progress\"><div class=\"progress-bar $swap_usage_level\" role=\"progressbar\" aria-valuenow=\"$swap_usage\" aria-valuemin=\"0\" aria-valuemax=\"100\" style=\"width: $swap_usage%;\">$swap_usage%</div></div></tr><tr><td class='data-label'>$string_swap_used<i class='fa fa-circle'></i>&nbsp;</td><td>${swap_used}</td></tr><tr><td class='data-label'>$string_swap_free<i class='fa fa-circle-o'></i>&nbsp;</td><td>${swap_available}</td></tr><tr><td class='data-label'>$string_swap_total</td><td>${swap_total}</td></tr><tr><td class='data-label'>$string_swap_devices</td><td>"
+    for swap in $swaps;do
+        specific_swap_usage=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f3)
+        specific_swap_total=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f2)
+        specific_swap="$specific_swap_usage/$specific_swap_total"
+        swap_html="$swap_html<code>$swap</code> - $specific_swap<br />"
+    done
+    swap_html="$swap_html</td></tr></tbody></table></div>"
+fi
 
 content_type html
 
@@ -314,13 +375,7 @@ html <<EOF
                 </div>
             </div><br />
             <div class="row">
-EOF
-if [[ "$swap_enabled" == "true" ]];then
-    html "                <div class=\"col-md-4\">"
-else
-    html "                <div class=\"col-md-6\">"
-fi
-html <<EOF
+                $swap_column
                     <h5 class='section-header'>$string_cpu</h5>
                     <table>
                         <tbody>
@@ -330,6 +385,10 @@ html <<EOF
                                         $cpu_usage%
                                     </div>
                                 </div>
+                            </tr>
+                            <tr>
+                                <td class='data-label'>$string_cpu_temp<i class='glyphicon glyphicon-fire'></i>&nbsp;</td>
+                                <td>$cpu_temp_c&deg;C / $cpu_temp_f&deg;F</td>
                             </tr>
                             <tr>
                                 <td class='data-label'>$string_loadavgs<i class='fa fa-tasks'></i>&nbsp;</td>
@@ -342,27 +401,13 @@ html <<EOF
                             <tr>
                                 <td class='data-label'><i class='fa fa-rocket'></i>&nbsp;</td>
                                 <td>
-EOF
-i=0
-for cpu_core in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor;do
-    i=$(( $i + 1 ))
-    current_gov=$(<"$cpu_core")
-    html "CPU#$i: $current_gov<br />"
-done
-i=
-html <<EOF
+                                    $cpufreq_data
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-EOF
-if [[ "$swap_enabled" == "true" ]];then
-    html "                <div class=\"col-md-4\">"
-else
-    html "                <div class=\"col-md-6\">"
-fi
-html <<EOF
+                $swap_column
                     <h5 class='section-header'>$string_ram</h5>
                     <table>
                         <tbody>
@@ -388,51 +433,7 @@ html <<EOF
                         </tbody>
                     </table>
                 </div>
-EOF
-if [[ "$swap_enabled" == "true" ]];then
-    html <<EOF
-                <div class='col-md-4'>
-                    <h5 class='section-header'>$string_swap</h5>
-                    <table>
-                        <tbody>
-                            <tr>
-                                <div class="progress">
-                                    <div class="progress-bar $swap_usage_level" role="progressbar" aria-valuenow="$swap_usage" aria-valuemin="0" aria-valuemax="100" style="width: $swap_usage%;">
-                                        $swap_usage%
-                                    </div>
-                                </div>
-                            </tr>
-                            <tr>
-                                <td class='data-label'>$string_swap_used<i class='fa fa-circle'></i>&nbsp;</td>
-                                <td>${swap_used}</td>
-                            </tr>
-                            <tr>
-                                <td class='data-label'>$string_swap_free<i class='fa fa-circle-o'></i>&nbsp;</td>
-                                <td>${swap_available}</td>
-                            </tr>
-                            <tr>
-                                <td class='data-label'>$string_swap_total</td>
-                                <td>${swap_total}</td>
-                            </tr>
-                            <tr>
-                                <td class='data-label'>$string_swap_devices</td>
-                                <td>
-EOF
-    for swap in $swaps;do
-        specific_swap_usage=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f3)
-        specific_swap_total=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f2)
-        specific_swap="$specific_swap_usage/$specific_swap_total"
-        html "<code>$swap</code> - $specific_swap<br />"
-    done
-    html <<EOF
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-EOF
-fi
-html <<EOF
+                $swap_html
             </div>$footer
         </div>
     </body>

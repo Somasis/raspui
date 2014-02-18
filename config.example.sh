@@ -29,6 +29,8 @@ string_ram="RAM"
 string_swap="Swap"
 string_loadavgs="Load average&nbsp;"
 
+string_cpu_temp="Heat&nbsp;"
+
 string_ram_used="Used&nbsp;"
 string_ram_free="Free&nbsp;"
 string_ram_total="Total&nbsp;"
