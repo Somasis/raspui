@@ -175,24 +175,6 @@ _grep() {
     _OLDIFS=
 }
 
-# round(dividend/divisor): gives you a properly rounded version of $dividend/$divisor
-round() { # src: http://ubuntuforums.org/showthread.php?t=1371892&p=8606385#post8606385
-    _x="$1"
-    _y="$2"
-    _a=$(( $_x/$_y ))
-    _b=$(( ($_x * 10) / $_y ))
-    _c=$(( $_b - ($_a *10 ) ))
-    if [[ "$_c" -lt 5 ]]; then
-        _a=$(( $_a + 1 ))
-    fi
-    echo "$_a"
-    _x=
-    _y=
-    _a=
-    _b=
-    _c=
-}
-
 # replace_spaces(string,): gives a version of the string with spaces replaced with <1>, can use stdin instead
 replace_spaces() { # replaces tr -d ' '
     if [[ -z "$1" ]];then
@@ -231,4 +213,44 @@ html() {
 # print_html(): just prints the html in the $_html variable, which has been minimized
 print_html() {
     echo "$_html"
+}
+
+# calc([arithmetic]): calculate math functions. tries to use bc if it exists, otherwise fallback to bash builtins.
+#   if no args given, it'll use stdin. scale=[number] is also removed from input if bc does not exist, so it basically
+#   functions as a drop-in replacement for bc in most shell script usages.
+calc() {
+    _calc_input=${*:-stdin}
+    if [[ $_calc_input == stdin ]];then # use stdin if no args
+        _calc_input=$(</dev/stdin)
+    fi
+    _calc_bc_exists=$(type -fp bc 2>&1 >/dev/null; echo $?) # use the builtin path search instead of `which`
+    if [[ $force_floating_point != 'true' && $_calc_bc_exists -ne 0 ]];then # make sure floating point calc is not forced and that bc exists
+        _calc=$(echo "$_calc_input" | sed 's/scale=.*; //')
+        echo "$(( $_calc ))"
+    else
+        echo "$_calc_input" | bc | sed 's/\.[0]*$//g' # get rid of leftover zeros, those are annoying
+    fi
+    _calc=
+    _calc_input=
+    _calc_bc_exists=
+}
+
+# converttohr(byte amount): converts to human readable amount
+converttohr() {
+    _SLIST="bytes,kB,MB,GB,TB,PB,EB,ZB,YB"
+
+    _POWER=1
+    _VAL=$( echo "scale=2; $1 / 1" | bc)
+    _VINT=$( echo $_VAL / 1024 | bc )
+    while [[ $_VINT -gt 0 ]];do
+        let _POWER=_POWER+1
+        _VAL=$( echo "scale=2; $_VAL / 1024" | bc)
+        _VINT=$( echo $_VAL / 1024 | bc )
+    done
+
+    echo "$_VAL $(echo $_SLIST | cut -f$_POWER -d, )"
+    _SLIST=
+    _POWER=
+    _VAL=
+    _VINT=
 }

@@ -10,6 +10,7 @@ licensed under [the MIT License](LICENSE).
 
 ## features
 
+- a pretty interface :)
 - basic info
     - local time and date
     - hostname
@@ -18,8 +19,9 @@ licensed under [the MIT License](LICENSE).
     - kernel version, release, and machine hardware name
     - uptime
 - network information
-    - local network and remote IP address (courtesy of [canhazip.com](http://canhazip.com))
+    - local network and remote IP address
     - current active network interface
+    - up/down stats for network interface
 - software information
     - server software/version
     - bash version (raspui runs on bash, if you didn't know)
@@ -33,20 +35,29 @@ licensed under [the MIT License](LICENSE).
     - running processes
     - current cpufreq governor (per-core)
 - RAM usage
-    - free/used/total in megabyte/kilobyte amounts
+    - free/used/total in human-readable amounts
 - Swap (only shows if you have any swap files or partitions)
-    - free/used/total in megabyte/kilobyte amounts
+    - free/used/total in human-readable amounts
     - show active swap devices and per-device usage
+
+## requirements
+
+currently, the only requirements are:
+- a moderately recent version of bash
+    - i develop on version 4.2.45, but basically any version from about 3.0 up should work
+- bc
+    - if you want precise numbers for usage statistics, you need bc. it's a small package though, so it's not too much of a problem.
+    - if you don't have it, raspui will fallback to using bash's built-in calculations, which is not floating-point based.
 
 ## installation
 
-[make sure you have enabled CGI for .sh scripts.](#cgi)
+[check the requirements before installing](#requirements), and [make sure you have enabled CGI for .sh scripts](#cgi).
 
     cd /path/to/webserver/directory/you/want/to/install/to/
     git clone https://github.com/Somasis/raspui.git
     cd raspui
 
-and if you need to change the defaults:
+if you want to change the defaults:
 
     mv config.example.sh config.sh
 
@@ -62,6 +73,8 @@ don't change settings in config.example.sh, as they are overwritten on [update](
 
 any variables not specified in config.sh will be inherited from config.example.sh and hardcoded defaults.
 
+- force_floating_point: attempt to force the usage of floating point calculations
+    - warning: this will probably fail if you don't have 'bc' in the $PATH
 - cpu_track_count: how many times to check the CPU usage before printing it out.
     - this is a variable you probably don't want to mess with unless you think you're getting inaccurate readings, or it's taking too much time to load the page. the default is pretty minimal, and it hasn't given me inaccurate readings yet, however.
     - the reason this is needed is because reading /proc/stat only gives you the current CPU usage at the very moment you read it. every program that has to calculate CPU usage *must* read this file multiple times, or else the usage is inaccurate.

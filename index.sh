@@ -63,8 +63,8 @@ process_total=$(ps --no-header -ax 2>/dev/null | wc -l)
 packages_installed="$get_installed_packages"
 package_manager_version="$get_package_manager_version"
 
-kernel_release="$(uname -s)/$(uname -rm)"
-kernel_version=$(uname -v)
+kernel_release="$(</proc/sys/kernel/ostype)/$(</proc/sys/kernel/osrelease) $(uname -m)"
+kernel_version=$(</proc/sys/kernel/version)
 
 loadavg=$(cut -d' ' -f1-3 /proc/loadavg)
 loadavg_1min=$(echo "$loadavg" | cut -d' ' -f1)
@@ -95,7 +95,12 @@ else
         remote_ip="$(<'./cache/ip') (cached)"
     fi
 fi
+
 active_interface=$(route -n | grep "^0.0.0.0" | rev | cut -d' ' -f1 | rev)
+
+interface_recieved=$(converttohr $(</sys/class/net/$active_interface/statistics/rx_bytes))
+
+interface_transferred=$(converttohr $(</sys/class/net/$active_interface/statistics/tx_bytes))
 
 # we used to use a few if statements to get this, but i think EST is more useful
 # than giving something like "America/New York" as the timezone.
@@ -106,14 +111,11 @@ timezone=$(date +'%Z (UTC%z)')
 
 # calculate RAM usage
 ram_info=$(_grep 'Mem' "/proc/meminfo" | replace_spaces)
-ram_total=$(echo "$ram_info" | _grep MemTotal | cut -d':' -f2 | tr -d '[A-z]')
-ram_available=$(echo "$ram_info" | _grep MemFree | cut -d':' -f2 | tr -d '[A-z]')
-ram_used=$(( $ram_total - $ram_available ))
+ram_total=$(calc $(echo "$ram_info" | _grep MemTotal | cut -d':' -f2 | tr -d '[A-z]') \* 1024)
+ram_available=$(calc $(echo "$ram_info" | _grep MemFree | cut -d':' -f2 | tr -d '[A-z]') \* 1024)
+ram_used=$(calc "$ram_total - $ram_available")
 
-# most ways recommended using bc, but to reduce dependencies
-#   we can just use expr, which is a part of coreutils.
-#   as far as my testing goes, it works just as well.
-ram_usage=$(expr $(expr "$ram_used" \* 100 ) / $ram_total )
+ram_usage=$(calc "($ram_used*100)/$ram_total")
 
 if [[ "$ram_usage" -gt "$ram_warning_level" ]];then
     ram_usage_level=progress-bar-danger
@@ -125,35 +127,20 @@ else
     ram_usage_level=progress-bar-info
 fi
 
-if [[ "$ram_total" -ge 1024 ]];then
-    ram_prefix=MB
-else
-    ram_prefix=kB
-fi
-ram_total=$(round "$ram_total" 1024)$ram_prefix # now convert to megabytes for presenting
-if [[ "$ram_available" -ge 1024 ]];then
-    ram_prefix=MB
-else
-    ram_prefix=kB
-fi
-ram_available=$(round "$ram_available" 1024)$ram_prefix
-if [[ "$ram_used" -ge 1024 ]];then
-    ram_prefix=MB
-else
-    ram_prefix=kB
-fi
-ram_used=$(round "$ram_used" 1024)$ram_prefix
+ram_total=$(converttohr "$ram_total")
+ram_available=$(converttohr "$ram_available")
+ram_used=$(converttohr "$ram_used")
 
 if [[ "$(( $(wc -l /proc/swaps | cut -d ' ' -f1) - 1 ))" -ne 0 ]];then
     swap_enabled=true
     swaps=$(cut -d' ' -f1 /proc/swaps | _grep /)
     swap_info=$(_grep 'Swap' "/proc/meminfo" | replace_spaces)
-    swap_total=$(echo "$swap_info" | _grep SwapTotal | cut -d':' -f2 | tr -d '[A-z]')
-    swap_available=$(echo "$swap_info" | _grep SwapFree | cut -d':' -f2 | tr -d '[A-z]')
-    swap_used=$(( $swap_total - $swap_available ))
+    swap_total=$(calc $(echo "$swap_info" | _grep SwapTotal | cut -d':' -f2 | tr -d '[A-z]') \* 1024)
+    swap_available=$(calc $(echo "$swap_info" | _grep SwapFree | cut -d':' -f2 | tr -d '[A-z]') \* 1024 )
+    swap_used=$(calc "$swap_total - $swap_available")
 
     # calculate swap usage
-    swap_usage=$(expr $(expr "$swap_used" \* 100 ) / $swap_total )
+    swap_usage=$(( $(( $swap_used * 100 )) / $swap_total ))
 
     if [[ "$swap_usage" -gt "$swap_warning_level" ]];then
         swap_usage_level=progress-bar-danger
@@ -165,24 +152,9 @@ if [[ "$(( $(wc -l /proc/swaps | cut -d ' ' -f1) - 1 ))" -ne 0 ]];then
         swap_usage_level=progress-bar-info
     fi
 
-    if [[ "$swap_total" -ge 1024 ]];then
-        swap_prefix=MB
-    else
-        swap_prefix=kB
-    fi
-    swap_total=$(round "$swap_total" 1024)$swap_prefix # now convert to megabytes for presenting
-    if [[ "$swap_available" -ge 1024 ]];then
-        swap_prefix=MB
-    else
-        swap_prefix=kB
-    fi
-    swap_available=$(round "$swap_available" 1024)$swap_prefix
-    if [[ "$swap_used" -ge 1024 ]];then
-        swap_prefix=MB
-    else
-        swap_prefix=kB
-    fi
-    swap_used=$(round "$swap_used" 1024)$swap_prefix
+    swap_total=$(converttohr "$swap_total")
+    swap_available=$(converttohr "$swap_available")
+    swap_used=$(converttohr "$swap_used")
 fi
 
 if [[ "$swap_enabled" == "true" ]];then
@@ -201,15 +173,15 @@ while true;do
         break
     fi
     current_gov=$(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_governor")
-    current_freq=$(round $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq") 1000)
-    min_freq=$(round $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_min_freq") 1000)
-    max_freq=$(round $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq") 1000)
+    current_freq=$(calc $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_cur_freq") / 1000)
+    min_freq=$(calc $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_min_freq") / 1000)
+    max_freq=$(calc $(<"/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq") / 1000)
     i=$(( $i + 1 ))
     cpufreq_data="${cpufreq_data}CPU#$i: $current_gov, ${current_freq}MHz<br />${min_freq}MHz min / ${max_freq}MHz max<br />"
 done
 
-cpu_temp_c=$(round $(</sys/class/thermal/thermal_zone0/temp) 1000)
-cpu_temp_f=$(( $(( $(( $cpu_temp_c * 9 )) / 5 )) + 32 )) # celsius to fahrenheit: $c*9/5+32
+cpu_temp_c=$(calc $(</sys/class/thermal/thermal_zone0/temp) / 1000)
+cpu_temp_f=$(calc "$cpu_temp_c \* 9 / 5 + 32") # celsius to fahrenheit: $c*9/5+32
 
 i=
 
@@ -306,7 +278,7 @@ html <<EOF
                     <table>
                         <tbody>
                             <tr>
-                                <td class='data-label'><i class='fa fa-home'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-home' style='margin-right:-1px'></i>&nbsp;</td>
                                 <td>$HOSTNAME</td>
                             </tr>
                             <tr>
@@ -344,8 +316,11 @@ html <<EOF
                                 <td>$remote_ip</td>
                             </tr>
                             <tr>
-                                <td class='data-label'>&nbsp;</td>
-                                <td>$active_interface</td>
+                                <td class='data-label'><i class='fa fa-exchange'></i>&nbsp;</td>
+                                <td>$active_interface
+                                    <br /><i class='fa fa-arrow-circle-o-down'></i>&nbsp;$interface_recieved
+                                    <br /><i class='fa fa-arrow-circle-o-up'></i>&nbsp;$interface_transferred
+                                </td>
                             </tr>
                         </tbody>
                     </table>

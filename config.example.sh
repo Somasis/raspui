@@ -1,6 +1,8 @@
 # https://github.com/somasis/raspui#configuration
 # visit the github's readme for help with configuration,
 # i don't maintain that thing for nothin' bub
+force_floating_point=false
+
 cpu_track_count=2
 
 cpu_warning_level=85
@@ -10,6 +12,10 @@ cpu_medium_level=25
 ram_warning_level=85
 ram_high_level=70
 ram_medium_level=30
+
+swap_warning_level=20
+swap_high_level=10
+swap_medium_level=5
 
 get_package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
 get_installed_packages=$(pacman --color never -Qq | wc -l)
