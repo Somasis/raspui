@@ -84,11 +84,11 @@ loadavg_15min=$(echo "$loadavg" | cut -d' ' -f3)
 local_ip=$(ip route | grep src | sed 's/.*src //;s/ .*//')
 
 retrieve_ip() {
-    remote_ip=$(wget -qO - http://ipecho.net/plain)
+    remote_ip=$(wget -T 2 -qO - http://whatismyip.akamai.com/)
     if [[ -z "$remote_ip" ]];then
-        remote_ip=$(wget -qO - http://whatismyip.akamai.com/)
+        remote_ip=$(wget -T 3 -qO - "http://canhazip.com" | head -n1)
         if [[ -z "$remote_ip" ]];then
-            remote_ip=$(wget -qO - "http://canhazip.com" | head -n1)
+            remote_ip=$(wget -T 4 -qO - http://ipecho.net/plain)
         fi
     fi
     echo "$remote_ip"
