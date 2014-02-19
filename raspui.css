@@ -1,3 +1,12 @@
+.progress {
+    background-image: -webkit-linear-gradient(top,#0A0A0A 0,#474747 100%);
+    background-image: linear-gradient(to bottom,#0A0A0A 0,#474747 100%);
+}
+
+.progress-bar:empty {
+    background-image: none;
+}
+
 td {
     padding: 1px !important;
     vertical-align: top;
@@ -6,6 +15,13 @@ td {
 .data-label {
     text-align: right;
     padding-right: 2px;
+}
+
+.data-label .fa {
+    margin-right:1px;
+}
+.data-label .fa .fa-home {
+    margin-right:0px;
 }
 
 .raspi-logo {
@@ -62,6 +78,7 @@ td {
     border: 0;
     border-bottom: 1px solid #eee
 }
+
 .logo {
     float: left;
 }

@@ -2,6 +2,7 @@
 
 . functions.sh
 
+git_repo_url="https://github.com/somasis/raspui"
 version="/$(git rev-parse --short HEAD)"
 if [[ "$version" == "/" ]];then
     version="/dev"
@@ -16,8 +17,17 @@ fi
 if [[ -f "config.example.sh" ]];then
     . config.example.sh
 fi
+
 if [[ -f "config.sh" ]];then
     . config.sh
+fi
+
+if [[ ! -f "config.sh" && ! -f "config.example.sh" ]];then
+    important_alerts="$important_alerts<div class=\"alert alert-danger\"><strong>Config files missing!</strong> The configuration files are missing, you're going to run into some problems.<br />Run <code>git pull</code> in the raspui directory to get the default config from the <a href='$git_repo_url' class='alert-link'>git repository</a>.</div>"
+fi
+
+if [[ "$_calc_bc_exists" -ne 0 ]];then
+    footer="$footer<div class=\"alert alert-warning\"><strong>Floating point calculations disabled.</strong>&nbsp;&nbsp;<code><a href='https://duckduckgo.com/?q=bc+$RELEASE_ID+package'>bc</a></code> is not installed, this means that bash's built-in math functions are used. Statistics will not be as accurate.</div>"
 fi
 
 # calculating CPU usage
@@ -98,9 +108,13 @@ fi
 
 active_interface=$(route -n | grep "^0.0.0.0" | rev | cut -d' ' -f1 | rev)
 
-interface_recieved=$(converttohr $(</sys/class/net/$active_interface/statistics/rx_bytes))
+interface_recieved=$(<"/sys/class/net/$active_interface/statistics/rx_bytes")
+interface_transferred=$(<"/sys/class/net/$active_interface/statistics/tx_bytes")
+interface_total=$(( $interface_recieved + $interface_transferred ))
 
-interface_transferred=$(converttohr $(</sys/class/net/$active_interface/statistics/tx_bytes))
+interface_recieved=$(converttohr "$interface_recieved")
+interface_transferred=$(converttohr "$interface_transferred")
+interface_total=$(converttohr "$interface_total")
 
 # we used to use a few if statements to get this, but i think EST is more useful
 # than giving something like "America/New York" as the timezone.
@@ -181,16 +195,15 @@ while true;do
 done
 
 cpu_temp_c=$(calc $(</sys/class/thermal/thermal_zone0/temp) / 1000)
-cpu_temp_f=$(calc "$cpu_temp_c \* 9 / 5 + 32") # celsius to fahrenheit: $c*9/5+32
+cpu_temp_f=$(calc $cpu_temp_c \* 9 / 5 + 32) # celsius to fahrenheit: $c*9/5+32
 
 i=
 
 if [[ "$raspi_logo" == "true" ]];then
-    raspi_logo="<div class='header-logo'><a href='$REQUEST_URI'><i style='color:$raspi_logo_color' class='raspi-logo raspi-icon raspi-o1 text-center'></i></a><a href='https://github.com/somasis/raspui'><small class='show-on-hover small'>raspui$version</small></a></div>"
-    footer=
+    raspi_logo="<div class='header-logo text-center'><a href='$REQUEST_URI'><i style='color:$raspi_logo_color' class='raspi-logo raspi-icon raspi-o1 text-center'></i></a><a href='$git_repo_url'><small class='show-on-hover small'>raspui$version</small></a></div>"
 else
     raspi_logo=
-    footer="<footer class='text-center'><a href='https://github.com/somasis/raspui'><small class='small'>raspui$version</small></a></footer>"
+    footer="$footer<a href='$git_repo_url'><small class='small'>raspui$version</small></a>"
 fi
 
 uptime=$(</proc/uptime)
@@ -215,7 +228,7 @@ fi
 uptime="$days$hours$minutes$seconds"
 
 if [[ "$swap_enabled" == "true" ]];then
-    swap_html="$swap_html<div class='col-md-4'><h5 class='section-header'>$string_swap</h5><table><tbody><tr><div class=\"progress\"><div class=\"progress-bar $swap_usage_level\" role=\"progressbar\" aria-valuenow=\"$swap_usage\" aria-valuemin=\"0\" aria-valuemax=\"100\" style=\"width: $swap_usage%;\">$swap_usage%</div></div></tr><tr><td class='data-label'>$string_swap_used<i class='fa fa-circle'></i>&nbsp;</td><td>${swap_used}</td></tr><tr><td class='data-label'>$string_swap_free<i class='fa fa-circle-o'></i>&nbsp;</td><td>${swap_available}</td></tr><tr><td class='data-label'>$string_swap_total</td><td>${swap_total}</td></tr><tr><td class='data-label'>$string_swap_devices</td><td>"
+    swap_html="$swap_html<div class='col-md-4'><h5 class='section-header'>$string_swap</h5><table><tbody><tr><div class=\"progress\"><div class=\"progress-bar $swap_usage_level\" role=\"progressbar\" aria-valuenow=\"$swap_usage\" aria-valuemin=\"0\" aria-valuemax=\"100\" style=\"width: $swap_usage%;\">$swap_usage%</div></div></tr><tr><td class='data-label'>$string_swap_used<i class='fa fa-circle'></i>&nbsp;</td><td>${swap_used}</td></tr><tr><td class='data-label'>$string_swap_free<i class='fa fa-circle-o'></i>&nbsp;</td><td>${swap_available}</td></tr><tr><td class='data-label'>$string_total</td><td>${swap_total}</td></tr><tr><td class='data-label'>$string_swap_devices</td><td>"
     for swap in $swaps;do
         specific_swap_usage=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f3)
         specific_swap_total=$(echo "$swap_usage_data" | grep "^$swap " | cut -d' ' -f2)
@@ -225,6 +238,9 @@ if [[ "$swap_enabled" == "true" ]];then
     swap_html="$swap_html</td></tr></tbody></table></div>"
 fi
 
+if [[ ! -z "$footer" ]];then
+    footer="<br /><footer>$footer</footer>"
+fi
 content_type html
 
 html <<EOF
@@ -272,17 +288,18 @@ html <<EOF
                     </div>
                 </div>
             </header>
+            $important_alerts
             <div class="row">
                 <div class="col-md-4">
                     <h4 class='section-header'>$string_system_header</h4>
                     <table>
                         <tbody>
                             <tr>
-                                <td class='data-label'><i class='fa fa-home' style='margin-right:-1px'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-home'></i>&nbsp;</td>
                                 <td>$HOSTNAME</td>
                             </tr>
                             <tr>
-                                <td class='data-label'><i class='fa fa-user'></i>&nbsp;</td>
+                                <td class='data-label'><i class='fa fa-users'></i>&nbsp;</td>
                                 <td><span class="badge">$unique_users</span> ($online_users$string_users_non_unique)
                             <tr>
                                 <td class='data-label'><i class='fa fa-linux'></i>&nbsp;</td>
@@ -320,6 +337,7 @@ html <<EOF
                                 <td>$active_interface
                                     <br /><i class='fa fa-arrow-circle-o-down'></i>&nbsp;$interface_recieved
                                     <br /><i class='fa fa-arrow-circle-o-up'></i>&nbsp;$interface_transferred
+                                    <br />$string_total&nbsp;$interface_total
                                 </td>
                             </tr>
                         </tbody>
@@ -402,7 +420,7 @@ html <<EOF
                                 <td>${ram_available}</td>
                             </tr>
                             <tr>
-                                <td class='data-label'>$string_ram_total</td>
+                                <td class='data-label'>$string_total</td>
                                 <td>${ram_total}</td>
                             </tr>
                         </tbody>
@@ -410,6 +428,8 @@ html <<EOF
                 </div>
                 $swap_html
             </div>$footer
+            <br />
+            <br />
         </div>
     </body>
 </html>

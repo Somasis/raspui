@@ -39,12 +39,10 @@ string_cpu_temp="Heat&nbsp;"
 
 string_ram_used="Used&nbsp;"
 string_ram_free="Free&nbsp;"
-string_ram_total="Total&nbsp;"
-
 string_swap_used="Used&nbsp;"
 string_swap_free="Free&nbsp;"
-string_swap_total="Total&nbsp;"
 string_swap_devices="Devices&nbsp;"
+string_total="Total&nbsp;"
 
 string_system_header="System"
 string_network_header="Network"

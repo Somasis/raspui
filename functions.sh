@@ -8,7 +8,12 @@ for file in /etc/*-release;do
         eval "RELEASE_$release_line"
     done
 done
+RELEASE_ID=${RELEASE_ID:-$RELEASE_DISTRIB_ID}
+RELEASE_PRETTY_NAME=${RELEASE_PRETTY_NAME:-$RELEASE_NAME}
+RELEASE_PRETTY_NAME=${RELEASE_PRETTY_NAME:-$RELEASE_DISTRIB_ID}
 IFS="$_OLDIFS"
+
+_calc_bc_exists=$(type -fp bc 2>&1 >/dev/null; echo $?) # use the builtin path search instead of `which`
 
 # tells the script what protocol the browser is using
 # we probably should do this a different way, however...
@@ -223,7 +228,6 @@ calc() {
     if [[ $_calc_input == stdin ]];then # use stdin if no args
         _calc_input=$(</dev/stdin)
     fi
-    _calc_bc_exists=$(type -fp bc 2>&1 >/dev/null; echo $?) # use the builtin path search instead of `which`
     if [[ $force_floating_point != 'true' && $_calc_bc_exists -ne 0 ]];then # make sure floating point calc is not forced and that bc exists
         _calc=$(echo "$_calc_input" | sed 's/scale=.*; //')
         echo "$(( $_calc ))"
@@ -240,12 +244,12 @@ converttohr() {
     _SLIST="bytes,kB,MB,GB,TB,PB,EB,ZB,YB"
 
     _POWER=1
-    _VAL=$( echo "scale=2; $1 / 1" | bc)
-    _VINT=$( echo $_VAL / 1024 | bc )
+    _VAL=$(echo "scale=2; $1 / 1" | calc)
+    _VINT=$(echo $_VAL / 1024 | calc)
     while [[ $_VINT -gt 0 ]];do
         let _POWER=_POWER+1
-        _VAL=$( echo "scale=2; $_VAL / 1024" | bc)
-        _VINT=$( echo $_VAL / 1024 | bc )
+        _VAL=$(echo "scale=2; $_VAL / 1024" | calc)
+        _VINT=$(echo $_VAL / 1024 | calc)
     done
 
     echo "$_VAL $(echo $_SLIST | cut -f$_POWER -d, )"
