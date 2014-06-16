@@ -29,9 +29,9 @@ fi
 
 if [[ -z "$@" ]];then
     STDIN=$(</dev/stdin) # get stdin input, used for things like POST requests.
-    if [[ -n "${STDIN}" ]]; then # and then if there's anything
-      QUERY_STRING="${STDIN}&${QUERY_STRING}" # shove it into the QUERY_STRING
-    fi
+fi
+if [[ -n "${STDIN}" ]]; then # and then if there's anything
+    QUERY_STRING="${STDIN}&${QUERY_STRING}" # shove it into the QUERY_STRING
 fi
 
 # Handle GET and POST requests... (the QUERY_STRING will be set)
@@ -316,7 +316,5 @@ converttohr() {
     _VINT=
 }
 
-if [[ ! -z "$@" ]];then
-    read_config
-    eval "$@"
-fi
+read_config
+eval "$@"

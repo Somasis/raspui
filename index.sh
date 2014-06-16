@@ -43,21 +43,12 @@ local_ip=$(ip route | grep src | sed 's/.*src //;s/ .*//')
 
 OLDIFS="$IFS"
 IFS=$'\n'
-if [[ -f /etc/os-release ]];then
-    for line in $(</etc/os-release);do
-        eval "RELEASE_$line"
-        if [[ ! -z "$RELEASE_ID_LIKE" ]];then
-            RELEASE_ID=$(echo "$RELEASE_ID_LIKE" | tr '[A-Z]' '[a-z]')
-        fi
-        RELEASE_ID=$(echo "$RELEASE_ID" | tr '[A-Z]' '[a-z]')
-        if [[ "$RELEASE_ID" == "arch" ]];then
-            packages_installed=$(pacman --color never -Qq | wc -l)
-            package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
-        elif [[ "$RELEASE_ID" == "debian" ]];then
-            packages_installed=$(apt-cache pkgnames | wc -l)
-            package_manager_version=$(apt-cache -q show apt | grep Version | cut -d ' ' -f2 | cut -d'~' -f1 | head -n1)
-        fi
-    done
+if [[ "$RELEASE_ID" == "arch" ]];then
+    packages_installed=$(pacman --color never -Qq | wc -l)
+    package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
+elif [[ "$RELEASE_ID" == "debian" ]];then
+    packages_installed=$(apt-cache pkgnames | wc -l)
+    package_manager_version=$(apt-cache -q show apt | grep Version | cut -d ' ' -f2 | cut -d'~' -f1 | head -n1)
 else
     packages_installed="unknown"
     package_manager_version="unknown"
