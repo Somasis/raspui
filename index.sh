@@ -13,14 +13,7 @@ if [[ ! -d './cache/' ]];then
     mkdir ./cache/
 fi
 
-# read configuration files
-if [[ -f "config.example.sh" ]];then
-    . config.example.sh
-fi
-
-if [[ -f "config.sh" ]];then
-    . config.sh
-fi
+read_config
 
 if [[ ! -f "config.sh" && ! -f "config.example.sh" ]];then
     important_alerts="$important_alerts<div class=\"alert alert-danger\"><strong>Config files missing!</strong> The configuration files are missing, you're going to run into some problems.<br />Run <code>git pull</code> in the raspui directory to get the default config from the <a href='$git_repo_url' class='alert-link'>git repository</a>.</div>"
@@ -30,39 +23,7 @@ if [[ "$_calc_bc_exists" -ne 0 ]];then
     footer="$footer<div class=\"alert alert-warning\"><strong>Floating point calculations disabled.</strong>&nbsp;&nbsp;<code><a href='https://duckduckgo.com/?q=bc+$RELEASE_ID+package'>bc</a></code> is not installed, this means that bash's built-in math functions are used. Statistics will not be as accurate.</div>"
 fi
 
-# calculating CPU usage
-# we want to gather this information first, because if we do it after all
-# the processes this script has to make to get all the data, it could make
-# it seem much higher than it really is.
-count=0
-PREV_TOTAL=0
-PREV_IDLE=0
-while [[ "$count" -ne $cpu_track_count ]];do
-    CPU=($(sed -n 's/^cpu\s//p' /proc/stat))
-    IDLE=${CPU[3]} # Just the idle CPU time.
-    TOTAL=0
-    for VALUE in "${CPU[@]}"; do
-        TOTAL=$(( $TOTAL + $VALUE ))
-    done
-    DIFF_IDLE=$(( $IDLE - $PREV_IDLE ))
-    DIFF_TOTAL=$(( $TOTAL - $PREV_TOTAL ))
-    DIFF_USAGE=$(( $(( $(( $(( 1000 * $(( $DIFF_TOTAL - $DIFF_IDLE)) )) / $DIFF_TOTAL )) + 5)) / 10 ))
-    PREV_TOTAL="$TOTAL"
-    PREV_IDLE="$IDLE"
-    count=$(( $count + 1 ))
-    sleep .05s
-done
-cpu_usage="$DIFF_USAGE"
-if [[ "$cpu_usage" -gt "$cpu_warning_level" ]];then
-    cpu_usage_level=progress-bar-danger
-elif [[ "$cpu_usage" -gt "$cpu_high_level" ]];then
-    cpu_usage_level=progress-bar-warning
-elif [[ "$cpu_usage" -gt "$cpu_medium_level" ]];then
-    cpu_usage_level=progress-bar-success
-else
-    cpu_usage_level=progress-bar-info
-fi
-
+get_cpu
 
 unique_users=$(users | tr ' ' '\n')
 online_users=$(echo "$unique_users" | wc -l)

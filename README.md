@@ -66,6 +66,10 @@ any variables not specified in config.sh will be inherited from config.example.s
 
 - force_floating_point: attempt to force the usage of floating point calculations
     - warning: this will probably fail if you don't have 'bc' in the $PATH
+- use_cpu_cache: this will read cpu usage from /tmp/raspui-cpu-stats.txt
+    - this is only useful if you have a crontab entry updating it
+    - /tmp/raspui-cpu-stats.txt can be generated thirty seconds with ```bash /path/to/raspui/functions.sh manual_cpu_calc tocache```
+    - crontab entry that i use: ```* * * * * bash /var/www/raspui/functions.sh manual_cpu_calc tocache >/dev/null 2>&1```
 - cpu_track_count: how many times to check the CPU usage before printing it out.
     - this is a variable you probably don't want to mess with unless you think you're getting inaccurate readings, or it's taking too much time to load the page. the default is pretty minimal, and it hasn't given me inaccurate readings yet, however.
     - the reason this is needed is because reading /proc/stat only gives you the current CPU usage at the very moment you read it. every program that has to calculate CPU usage *must* read this file multiple times, or else the usage is inaccurate.
@@ -74,12 +78,6 @@ any variables not specified in config.sh will be inherited from config.example.s
     - high_level: when the progress bar turns orange.
     - medium_level: when the progress bar turns green
     - anything below the medium level will set the progress bar to blue
-- get_package_manager_version: command that will give the version of the package manager.
-    - default command is for arch linux, it prints 'pacman <package-version>'
-    - for a system running debian, try "echo $(dpkg-query -W apt) | cut -d' ' -f2"
-- get_installed_packages: command that will give a total of install packages, and nothing else
-    - default command is for arch linux
-    - for a system running debian (or a derivative of debian), try "dpkg-query -l | wc -l"
 - time/date: command to give current time/date in a nice format
     - pretty_time: subheading used on header to show pretty_time. you can basically make it anything, but by default it is used for time. 
         - by default, $pretty_time is "It's currently $time, on $date."

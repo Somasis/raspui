@@ -3,6 +3,8 @@
 # i don't maintain that thing for nothin' bub
 force_floating_point=false
 
+use_cpu_cache=true
+
 cpu_track_count=2
 
 cpu_warning_level=85

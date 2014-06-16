@@ -27,9 +27,11 @@ else
     PROTOCOL=http
 fi
 
-STDIN=$(</dev/stdin) # get stdin input, used for things like POST requests.
-if [[ -n "${STDIN}" ]]; then # and then if there's anything
-  QUERY_STRING="${STDIN}&${QUERY_STRING}" # shove it into the QUERY_STRING
+if [[ -z "$@" ]];then
+    STDIN=$(</dev/stdin) # get stdin input, used for things like POST requests.
+    if [[ -n "${STDIN}" ]]; then # and then if there's anything
+      QUERY_STRING="${STDIN}&${QUERY_STRING}" # shove it into the QUERY_STRING
+    fi
 fi
 
 # Handle GET and POST requests... (the QUERY_STRING will be set)
@@ -152,6 +154,16 @@ content_type() {
     echo
 }
 
+read_config() {
+    if [[ -f "config.example.sh" ]];then
+        . config.example.sh
+    fi
+
+    if [[ -f "config.sh" ]];then
+        . config.sh
+    fi
+}
+
 # grep(string to search for,[file, if empty stdin will be used]): very, very basic grep replacement.
 _grep() {
     _grep_for="$1"
@@ -239,6 +251,51 @@ calc() {
     _calc_bc_exists=
 }
 
+# get_cpu: get cpu stats and export them to variables, use cached version if we're using that method
+get_cpu() {
+    if [[ "$use_cpu_cache" == "true" && -f /tmp/raspui-cpu-stats.txt ]];then
+        cpu_usage=$(cut -d':' -f1 /tmp/raspui-cpu-stats.txt)
+        cpu_usage_level=$(cut -d':' -f2 /tmp/raspui-cpu-stats.txt)
+    else
+        manual_cpu_calc
+    fi
+}
+
+manual_cpu_calc() {
+    count=0
+    PREV_TOTAL=0
+    PREV_IDLE=0
+    while [[ "$count" -ne $cpu_track_count ]];do
+        CPU=($(sed -n 's/^cpu\s//p' /proc/stat))
+        IDLE=${CPU[3]} # Just the idle CPU time.
+        TOTAL=0
+        for VALUE in "${CPU[@]}"; do
+            TOTAL=$(( $TOTAL + $VALUE ))
+        done
+        DIFF_IDLE=$(( $IDLE - $PREV_IDLE ))
+        DIFF_TOTAL=$(( $TOTAL - $PREV_TOTAL ))
+        DIFF_USAGE=$(( $(( $(( $(( 1000 * $(( $DIFF_TOTAL - $DIFF_IDLE)) )) / $DIFF_TOTAL )) + 5)) / 10 ))
+        PREV_TOTAL="$TOTAL"
+        PREV_IDLE="$IDLE"
+        count=$(( $count + 1 ))
+        sleep .05s
+    done
+    cpu_usage="$DIFF_USAGE"
+    if [[ "$cpu_usage" -gt "$cpu_warning_level" ]];then
+        cpu_usage_level=progress-bar-danger
+    elif [[ "$cpu_usage" -gt "$cpu_high_level" ]];then
+        cpu_usage_level=progress-bar-warning
+    elif [[ "$cpu_usage" -gt "$cpu_medium_level" ]];then
+        cpu_usage_level=progress-bar-success
+    else
+        cpu_usage_level=progress-bar-info
+    fi
+    
+    if [[ "$1" == "tocache" ]];then
+        echo "$cpu_usage:$cpu_usage_level" > /tmp/raspui-cpu-stats.txt
+    fi
+}
+
 # converttohr(byte amount): converts to human readable amount
 converttohr() {
     _SLIST="bytes,kB,MB,GB,TB,PB,EB,ZB,YB"
@@ -258,3 +315,8 @@ converttohr() {
     _VAL=
     _VINT=
 }
+
+if [[ ! -z "$@" ]];then
+    read_config
+    eval "$@"
+fi
