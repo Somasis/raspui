@@ -98,6 +98,9 @@ if [[ -f /etc/os-release ]];then
         fi
     done
 else
+    packages_installed="unknown"
+    package_manager_version="unknown"
+fi
 
 IFS="$OLDIFS"
 OLDIFS=
