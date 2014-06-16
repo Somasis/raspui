@@ -4,6 +4,7 @@
 
 git_repo_url="https://github.com/somasis/raspui"
 version="/$(git rev-parse --short HEAD)"
+commit_message="$(git log -1 --pretty=%B)"
 if [[ "$version" == "/" ]];then
     version="/dev"
 fi
@@ -47,11 +48,12 @@ if [[ "$RELEASE_ID_LIKE" == "arch" ]];then
     packages_installed=$(pacman --color never -Qq | wc -l)
     package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
 elif [[ "$RELEASE_ID_LIKE" == "debian" ]];then
-    packages_installed="apt $(apt-cache pkgnames | wc -l)"
-    package_manager_version=$(apt-cache -q show apt | grep Version | cut -d ' ' -f2 | cut -d'~' -f1 | head -n1)
+    packages_installed=$(apt-cache pkgnames | wc -l)
+    package_manager_version="apt $(apt-cache -q show apt | grep Version | cut -d ' ' -f2 | cut -d'~' -f1 | head -n1)"
 else
-    packages_installed="unknown"
-    package_manager_version="unknown"
+    important_alerts="$important_alerts<div class=\"alert alert-danger\"><strong>Unable to find package manager methods.</strong> Raspui can't find what package manager you use.<br />Run <code>git pull</code> in the Raspui directory to update to the latest version of Raspui, then see if it works.<br />If it doesn't, <a href='$git_repo_url/issues/new' class='alert-link'>file a bug report</a>. Make sure to include what Linux distribution you're running.</div>"
+    packages_installed=
+    package_manager_version=
 fi
 
 IFS="$OLDIFS"
@@ -175,10 +177,10 @@ cpu_temp_f=$(calc $cpu_temp_c \* 9 / 5 + 32) # celsius to fahrenheit: $c*9/5+32
 i=
 
 if [[ "$raspi_logo" == "true" ]];then
-    raspi_logo="<div class='header-logo text-center'><a href='$REQUEST_URI'><i style='color:$raspi_logo_color' class='raspi-logo raspi-icon raspi-o1 text-center'></i></a><a href='$git_repo_url'><small class='show-on-hover small'>raspui$version</small></a></div>"
+    raspi_logo="<div class='header-logo text-center'><a href='$REQUEST_URI'><i style='color:$raspi_logo_color' class='raspi-logo raspi-icon raspi-o1 text-center'></i></a><a title='$commit_message' href='$git_repo_url'><small class='show-on-hover small'>raspui$version</small></a></div>"
 else
     raspi_logo=
-    footer="$footer<a href='$git_repo_url'><small class='small'>raspui$version</small></a>"
+    footer="$footer<a href='$git_repo_url' title='$commit_message'><small class='small'>raspui$version</small></a>"
 fi
 
 uptime=$(</proc/uptime)
