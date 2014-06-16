@@ -46,7 +46,7 @@ while [[ "$count" -ne $cpu_track_count ]];do
     done
     DIFF_IDLE=$(( $IDLE - $PREV_IDLE ))
     DIFF_TOTAL=$(( $TOTAL - $PREV_TOTAL ))
-    DIFF_USAGE=$(( $(( $(( $(( 1000 * $(( $DIFF_TOTAL - $DIFF_IDLE)) )) / $DIFF_TOTAL )) + 5)) / 10 )) 
+    DIFF_USAGE=$(( $(( $(( $(( 1000 * $(( $DIFF_TOTAL - $DIFF_IDLE)) )) / $DIFF_TOTAL )) + 5)) / 10 ))
     PREV_TOTAL="$TOTAL"
     PREV_IDLE="$IDLE"
     count=$(( $count + 1 ))
@@ -70,9 +70,6 @@ unique_users=$(echo "$unique_users" | sort -u | wc -l)
 
 process_total=$(ps --no-header -ax 2>/dev/null | wc -l)
 
-packages_installed="$get_installed_packages"
-package_manager_version="$get_package_manager_version"
-
 kernel_release="$(</proc/sys/kernel/ostype)/$(</proc/sys/kernel/osrelease) $(uname -m)"
 kernel_version=$(</proc/sys/kernel/version)
 
@@ -82,6 +79,29 @@ loadavg_5min=$(echo "$loadavg" | cut -d' ' -f2)
 loadavg_15min=$(echo "$loadavg" | cut -d' ' -f3)
 
 local_ip=$(ip route | grep src | sed 's/.*src //;s/ .*//')
+
+OLDIFS="$IFS"
+IFS=$'\n'
+if [[ -f /etc/os-release ]];then
+    for line in $(</etc/os-release);do
+        eval "RELEASE_$line"
+        if [[ ! -z "$RELEASE_ID_LIKE" ]];then
+            RELEASE_ID=$(echo "$RELEASE_ID_LIKE" | tr '[A-Z]' '[a-z]')
+        fi
+        RELEASE_ID=$(echo "$RELEASE_ID" | tr '[A-Z]' '[a-z]')
+        if [[ "$RELEASE_ID" == "arch" ]];then
+            packages_installed=$(pacman --color never -Qq | wc -l)
+            package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
+        elif [[ "$RELEASE_ID" == "debian" ]];then
+            packages_installed=$(apt-cache pkgnames | wc -l)
+            package_manager_version=$(apt-cache -q show apt | grep Version | cut -d ' ' -f2 | cut -d'~' -f1 | head -n1)
+        fi
+    done
+else
+
+IFS="$OLDIFS"
+OLDIFS=
+line=
 
 retrieve_ip() {
     remote_ip=$(wget -T 2 -qO - http://whatismyip.akamai.com/)

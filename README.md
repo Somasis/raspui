@@ -1,7 +1,5 @@
 # raspui
-
 ![raspui logo](favicon-195.png)
-
 raspberry pi web interface, providing a look at the system status. probably works great on other systems as well, but i use it on my raspberry pi.
 
 heavily inspired by [raspcontrol](https://github.com/imjacobclark/Raspcontrol), but i thought i could do better. we'll just have to see about that!
@@ -9,7 +7,6 @@ heavily inspired by [raspcontrol](https://github.com/imjacobclark/Raspcontrol), 
 licensed under [the MIT License](LICENSE).
 
 ## features
-
 - a pretty interface :)
 - basic info
     - local time and date
@@ -39,9 +36,7 @@ licensed under [the MIT License](LICENSE).
 - Swap (only shows if you have any swap files or partitions)
     - free/used/total in human-readable amounts
     - show active swap devices and per-device usage
-
 ## requirements
-
 currently, the only requirements are:
 - a moderately recent version of bash
     - i develop on version 4.2.45, but basically any version from about 3.0 up should work
@@ -50,29 +45,21 @@ currently, the only requirements are:
     - if you don't have it, raspui will fallback to using bash's built-in calculations, which is not floating-point based.
 
 ## installation
-
 [check the requirements before installing](#requirements), and [make sure you have enabled CGI for .sh scripts](#cgi).
+```cd /path/to/webserver/directory/you/want/to/install/to/
+git clone https://github.com/Somasis/raspui.git
+cd raspui```
 
-    cd /path/to/webserver/directory/you/want/to/install/to/
-    git clone https://github.com/Somasis/raspui.git
-    cd raspui
-
-if you want to change the defaults:
-
-    mv config.example.sh config.sh
+if you want to change the defaults:```mv config.example.sh config.sh```
 
 then, go to your webserver and open index.sh. [adjust config.sh as needed.](#configuration)
 don't change settings in config.example.sh, as they are overwritten on [update](#updating)
-
 ## updating
-
-    cd /path/to/raspui/
-    git pull
+```cd /path/to/raspui/
+git pull```
 
 ## configuration
-
 any variables not specified in config.sh will be inherited from config.example.sh and hardcoded defaults.
-
 - force_floating_point: attempt to force the usage of floating point calculations
     - warning: this will probably fail if you don't have 'bc' in the $PATH
 - cpu_track_count: how many times to check the CPU usage before printing it out.
@@ -122,22 +109,16 @@ any variables not specified in config.sh will be inherited from config.example.s
     - respondjs_js: url used for respond.min.js
     - if you'd prefer to have local copies of these files, you can just give a relative path. for example, bootstrap_css in a folder named "styles" in the raspui folder, just do "styles/bootstrap.min.css"
 
-## cgi
-how to enable CGI for .sh scripts:
+## cgihow to enable CGI for .sh scripts:
 
-### lighttpd
-add this line to your lighttpd.conf file, which is probably located at /etc/lighttpd/lighttpd.conf or similar.
-
-    cgi.assign = ( ".sh" => "/bin/bash" )
+### lighttpdadd this line to your lighttpd.conf file, which is probably located at /etc/lighttpd/lighttpd.conf or similar.
+```cgi.assign = ( ".sh" => "/bin/bash" )```
 
 change the path to the bash shell if needed.
 
-### apache
-I use lighttpd, so that's what has the most support. if you run into any problems, I probably can't help you very well unless you're certain it's a problem with the script.
-
+### apacheI use lighttpd, so that's what has the most support. if you run into any problems, I probably can't help you very well unless you're certain it's a problem with the script.
 add this line to your apache configuration, which could be located at /etc/apache2/apache2.conf, or a similar location.
-
-    AddHandler cgi-script .sh
+```AddHandler cgi-script .sh```
 
 ## planned
 - CPU hog display
@@ -145,9 +126,7 @@ add this line to your apache configuration, which could be located at /etc/apach
 - world domination
 - ???
 
-## credits
-
-- [codepunker](https://github.com/codepunker) for their design tips, it looks a lot better because of them
+## credits- [codepunker](https://github.com/codepunker) for their design tips, it looks a lot better because of them
 - [the raspberry pi foundation](http://www.raspberrypi.org/) for making this great device
 - [the lighttpd project](http://www.lighttpd.net/) for making a very fast and very easy to set up development server
 

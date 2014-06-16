@@ -17,9 +17,6 @@ swap_warning_level=20
 swap_high_level=10
 swap_medium_level=5
 
-get_package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
-get_installed_packages=$(pacman --color never -Qq | wc -l)
-
 time=$(date +'%r')
 date=$(date +'%B %d, %Y')
 pretty_time="It's currently $time, on $date."
