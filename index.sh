@@ -43,11 +43,11 @@ local_ip=$(ip route | grep src | sed 's/.*src //;s/ .*//')
 
 OLDIFS="$IFS"
 IFS=$'\n'
-if [[ "$RELEASE_ID" == "arch" ]];then
+if [[ "$RELEASE_ID_LIKE" == "arch" ]];then
     packages_installed=$(pacman --color never -Qq | wc -l)
     package_manager_version=$(pacman --color never -Q pacman | tr ' ' '/')
-elif [[ "$RELEASE_ID" == "debian" ]];then
-    packages_installed=$(apt-cache pkgnames | wc -l)
+elif [[ "$RELEASE_ID_LIKE" == "debian" ]];then
+    packages_installed="apt $(apt-cache pkgnames | wc -l)"
     package_manager_version=$(apt-cache -q show apt | grep Version | cut -d ' ' -f2 | cut -d'~' -f1 | head -n1)
 else
     packages_installed="unknown"
@@ -152,7 +152,7 @@ else
     swap_column="                <div class=\"col-md-6\">"
 fi
 
-swap_usage_data=$(swapon -e --noheadings --raw --show=name,size,used)
+swap_usage_data=$(swapon -e --raw --show=name,size,used)
 
 cpu_model=$(echo $(_grep 'model name' /proc/cpuinfo | cut -d':' -f2))
 

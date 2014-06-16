@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$( cd "$(dirname "$0")"; pwd -P )"
+
 _OLDIFS="$IFS"
 IFS=$'\n'
 # read /etc/*-release files, they contain information about what system is being used.
@@ -254,8 +256,10 @@ calc() {
 # get_cpu: get cpu stats and export them to variables, use cached version if we're using that method
 get_cpu() {
     if [[ "$use_cpu_cache" == "true" && -f /tmp/raspui-cpu-stats.txt ]];then
-        cpu_usage=$(cut -d':' -f1 /tmp/raspui-cpu-stats.txt)
-        cpu_usage_level=$(cut -d':' -f2 /tmp/raspui-cpu-stats.txt)
+        export cpu_usage=$(cut -d':' -f1 /tmp/raspui-cpu-stats.txt)
+        export cpu_usage_level=$(cut -d':' -f2 /tmp/raspui-cpu-stats.txt)
+    elif [[ "$use_cpu_cache" == "true" && ! -f /tmp/raspui-cpu-stats.txt ]];then
+        manual_cpu_calc tocache
     else
         manual_cpu_calc
     fi
